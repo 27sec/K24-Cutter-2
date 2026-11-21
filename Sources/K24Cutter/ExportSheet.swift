@@ -213,7 +213,7 @@ struct ExportSheet: View {
 
 final class ExportState: ObservableObject {
     @Published var container: ExportSheet.Container = .source
-    @Published var mode: Exporter.Mode = .join
+    @Published var mode: Exporter.Mode = .separate
     @Published var outputDir: URL?
     @Published var clearAfterExport = true
     @Published var segments: [Segment] = []
