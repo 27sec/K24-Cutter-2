@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:K24-Cutter-2}",
+            "name": "Debug K24Cutter",
+            "target": "K24Cutter",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug K24Cutter"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:K24-Cutter-2}",
+            "name": "Release K24Cutter",
+            "target": "K24Cutter",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release K24Cutter"
+        }
+    ]
+}
