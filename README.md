@@ -4,7 +4,7 @@ macOS app (Swift / SwiftUI) for cutting TV recordings (.ts / .m2ts / .mp4 / .mkv
 
 ## Build
     brew install ffmpeg        # needs ffmpeg + ffprobe
-    ./build_app.sh             # -> dist/K24 Cutter.app
+    ./build_app.sh             # -> dist/K24 Cutter 2.app  (icon: swift tools/make_icon.swift)
 
 ## Usage
 1. Open a file (⌘O) or drag it onto the window.
