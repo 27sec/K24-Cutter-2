@@ -236,7 +236,11 @@ final class PlaybackEngine {
 
         let chunk = 4096
         let bytes = chunk * 8
-        let inflight = DispatchSemaphore(value: 12)   // ~1 s queued
+        // Limits queued audio to ~1 s. Created at 0 and topped up to 12: libdispatch traps if a
+        // semaphore is freed below its *initial* value, which happens when stop() discards queued
+        // buffers without running their completion handlers.
+        let inflight = DispatchSemaphore(value: 0)
+        for _ in 0..<12 { inflight.signal() }
         let raw = UnsafeMutableRawPointer.allocate(byteCount: bytes, alignment: 16)
         defer { raw.deallocate() }
 
