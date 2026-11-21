@@ -1,6 +1,10 @@
 #!/bin/zsh
-# Builds "K24 Cutter 2.app" (release) into ./dist
+# Builds "K24 Cutter 2.app" (release) into ./dist and installs it to /Applications
+#   ./build_app.sh               build + install (quits a running copy, relaunches it)
+#   ./build_app.sh --no-install  build only
 set -e
+INSTALL=1
+[[ "$1" == "--no-install" ]] && INSTALL=0
 cd "$(dirname "$0")"
 swift build -c release
 APP="dist/K24 Cutter 2.app"
@@ -39,3 +43,19 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true
 echo "Built: $APP"
+
+if (( INSTALL )); then
+  DEST="/Applications/K24 Cutter 2.app"
+  WAS_RUNNING=0
+  if pgrep -f "$DEST/Contents/MacOS/K24Cutter" >/dev/null; then
+    WAS_RUNNING=1
+    osascript -e 'tell application id "local.k24.cutter" to quit' >/dev/null 2>&1 || true
+    for i in {1..20}; do pgrep -f "$DEST/Contents/MacOS/K24Cutter" >/dev/null || break; sleep 0.25; done
+    pkill -f "$DEST/Contents/MacOS/K24Cutter" 2>/dev/null || true
+  fi
+  rm -rf "$DEST"
+  ditto "$APP" "$DEST"
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$DEST" || true
+  echo "Installed: $DEST"
+  if (( WAS_RUNNING )); then open "$DEST"; echo "Relaunched"; fi
+fi
