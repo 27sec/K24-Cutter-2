@@ -92,20 +92,37 @@ struct ExportSheet: View {
                 if st.running {
                     Button("Cancel Export") { st.exporter?.cancel() }
                 } else {
-                    Button(st.results.isEmpty ? "Cancel" : "Close") { dismiss() }
-                        .keyboardShortcut(.cancelAction)
-                    Button("Export") { start() }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(segments.isEmpty)
+                    if st.results.isEmpty {
+                        Button("Cancel") { close() }
+                            .keyboardShortcut(.cancelAction)
+                        Button("Export") { start() }
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(segments.isEmpty)
+                    } else {
+                        Button("Export Again") { start() }
+                        Button("Close") { close() }
+                            .keyboardShortcut(.defaultAction)
+                    }
                 }
             }
         }
         .padding(20)
         .frame(width: 580)
         .onAppear { st.output = defaultOutput() }
+        .onDisappear {
+            DispatchQueue.main.async {
+                NSApp.mainWindow?.makeFirstResponder(nil)
+                model.seek(to: model.cursor)    // refresh preview + strip
+            }
+        }
         .onChange(of: st.container) { _ in
             if let o = st.output { st.output = o.deletingPathExtension().appendingPathExtension(ext) }
         }
+    }
+
+    private func close() {
+        model.showExport = false
+        dismiss()
     }
 
     private func defaultOutput() -> URL? {

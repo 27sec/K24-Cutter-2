@@ -64,6 +64,7 @@ struct FrameView: NSViewRepresentable {
         layer.magnificationFilter = .linear
         v.layer = layer
         sink.layer = layer
+        DebugLog.log("FrameView makeNSView")
         return v
     }
     func updateNSView(_ nsView: NSView, context: Context) {}

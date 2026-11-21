@@ -113,3 +113,17 @@ enum TimeFmt {
         return f.string(from: NSNumber(value: bytes / 1_048_576)) ?? "-"
     }
 }
+
+/// Debug log, enabled with env K24_DEBUG_LOG=/path/file.log
+enum DebugLog {
+    static let path = ProcessInfo.processInfo.environment["K24_DEBUG_LOG"]
+    static let q = DispatchQueue(label: "k24.log")
+    static func log(_ s: @autoclosure () -> String) {
+        guard let path else { return }
+        let line = String(format: "%.3f ", Date().timeIntervalSince1970.truncatingRemainder(dividingBy: 1000)) + s() + "\n"
+        q.async {
+            if let h = FileHandle(forWritingAtPath: path) { h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); h.closeFile() }
+            else { try? line.write(toFile: path, atomically: false, encoding: .utf8) }
+        }
+    }
+}

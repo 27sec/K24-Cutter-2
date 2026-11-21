@@ -105,6 +105,21 @@ struct ControlPanel: View {
     }
 }
 
+/// NSTextField that only becomes first responder when clicked, so AppKit never
+/// auto-focuses it (e.g. after a sheet closes) and steals the editing shortcuts.
+final class ClickToEditField: NSTextField {
+    var allowFocus = false
+    override var acceptsFirstResponder: Bool { allowFocus && super.acceptsFirstResponder }
+    override func mouseDown(with event: NSEvent) {
+        allowFocus = true
+        window?.makeFirstResponder(self)
+        super.mouseDown(with: event)
+    }
+    override func cancelOperation(_ sender: Any?) {   // Esc leaves the field
+        window?.makeFirstResponder(nil)
+    }
+}
+
 /// Editable current-time field (HH:MM:SS.ff). Shows the cursor when not being edited.
 struct TimeField: NSViewRepresentable {
     @EnvironmentObject var model: EditorModel
@@ -117,6 +132,7 @@ struct TimeField: NSViewRepresentable {
         func controlTextDidEndEditing(_ obj: Notification) {
             editing = false
             guard let f = obj.object as? NSTextField else { return }
+            (f as? ClickToEditField)?.allowFocus = false
             let movement = obj.userInfo?["NSTextMovement"] as? Int
             if movement == NSTextMovement.return.rawValue {
                 if let t = TimeFmt.parse(f.stringValue, fps: model.fps) { model.seek(to: t) } else { NSSound.beep() }
@@ -129,7 +145,7 @@ struct TimeField: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
     func makeNSView(context: Context) -> NSTextField {
-        let f = NSTextField()
+        let f = ClickToEditField()
         f.font = .monospacedSystemFont(ofSize: 18, weight: .semibold)
         f.alignment = .center
         f.bezelStyle = .roundedBezel

@@ -94,6 +94,7 @@ final class EditorModel: ObservableObject {
         let (w, h) = info.previewSize(maxWidth: 1280)
         let main = FrameRequester(info: info)
         main.handler = { [weak self] _, imgs in
+            DebugLog.log("main handler playing=\(self?.isPlaying ?? false) imgs=\(imgs.count) layer=\(self?.frameSink.layer != nil)")
             guard let self, !self.isPlaying, let img = imgs.first else { return }
             self.frameSink.show(img)
         }
@@ -129,7 +130,9 @@ final class EditorModel: ObservableObject {
 
     func seek(to t: Double) {
         guard let info else { return }
+        endTextEditing()
         let target = info.snap(min(max(0, t), info.lastFrameTime))
+        DebugLog.log("seek \(target) playing=\(isPlaying)")
         cursor = target
         if isPlaying {
             player?.start(at: target)
@@ -138,6 +141,13 @@ final class EditorModel: ObservableObject {
         let (w, h) = info.previewSize(maxWidth: 1280)
         mainFrames?.request(.init(t: target, count: 1, w: w, h: h))
         scheduleStrip()
+    }
+
+    /// Give keyboard focus back to the editor (shortcuts are ignored while a text field edits).
+    func endTextEditing() {
+        if let w = NSApp.keyWindow, w.attachedSheet == nil, w.firstResponder is NSText {
+            w.makeFirstResponder(nil)
+        }
     }
 
     func step(frames: Int) {
@@ -185,12 +195,14 @@ final class EditorModel: ObservableObject {
     // MARK: Marks & segments
 
     func setMarkIn() {
+        endTextEditing()
         guard info != nil else { return }
         markIn = cursor
         if let o = markOut, o <= cursor { markOut = nil }
     }
 
     func setMarkOut() {
+        endTextEditing()
         guard info != nil else { return }
         markOut = cursor
         if let i = markIn, i >= cursor { markIn = nil }

@@ -58,6 +58,7 @@ final class FrameRequester {
 
     /// Call on main thread.
     func request(_ r: Request) {
+        DebugLog.log("request t=\(r.t) n=\(r.count) busy=\(busy) gen=\(generation)")
         if busy { pending = r; return }
         run(r)
     }
@@ -75,6 +76,7 @@ final class FrameRequester {
         queue.async {
             let imgs = FrameDecoder.decode(info, at: r.t, count: r.count, w: r.w, h: r.h)
             DispatchQueue.main.async {
+                DebugLog.log("result t=\(r.t) imgs=\(imgs.count) gen=\(gen)/\(self.generation)")
                 self.busy = false
                 if gen == self.generation { self.handler?(r, imgs) }
                 if let p = self.pending {
