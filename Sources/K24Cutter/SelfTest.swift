@@ -21,11 +21,14 @@ enum SelfTest {
 
             let segs = [Segment(start: 10, end: 20), Segment(start: 40, end: 55.5), Segment(start: 90, end: 100)]
             let dir = URL(fileURLWithPath: args.count > i + 2 ? args[i + 2] : NSTemporaryDirectory())
+            let base = url.deletingPathExtension().lastPathComponent
+            print("last index before:", Exporter.lastIndex(in: dir, base: base))
             for (mode, ext) in [(Exporter.Mode.join, "ts"), (.join, "mp4"), (.join, "mkv"), (.separate, "ts")] {
-                let out = dir.appendingPathComponent("selftest_\(mode == .join ? "join" : "sep").\(ext)")
+                let outs = Exporter.numberedOutputs(dir: dir, base: base, ext: ext,
+                                                    count: mode == .separate ? segs.count : 1)
                 let sem = DispatchSemaphore(value: 0)
                 t0 = Date()
-                Exporter().run(info: info, segments: segs, output: out, mode: mode, progress: { _, _ in }) { r in
+                Exporter().run(info: info, segments: segs, outputs: outs, mode: mode, progress: { _, _ in }) { r in
                     switch r {
                     case .success(let urls): print("export \(mode.rawValue) .\(ext):", urls.map(\.lastPathComponent), String(format: "%.2fs", Date().timeIntervalSince(t0)))
                     case .failure(let e): print("export FAILED:", e.localizedDescription)
@@ -34,6 +37,7 @@ enum SelfTest {
                 }
                 while sem.wait(timeout: .now()) == .timedOut { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
             }
+            print("last index after:", Exporter.lastIndex(in: dir, base: base))
         } catch {
             print("selftest error:", error.localizedDescription)
         }

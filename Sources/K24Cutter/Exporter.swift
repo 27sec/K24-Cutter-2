@@ -21,14 +21,41 @@ final class Exporter {
         if let p, p.isRunning { p.terminate() }
     }
 
+    // MARK: Output naming  —  "<source name>-001.ext", "-002", … continuing from the folder
+
+    /// Highest NNN already used in `dir` for files named "<base>-NNN.<any ext>" (0 if none).
+    static func lastIndex(in dir: URL, base: String) -> Int {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        let prefix = base + "-"
+        var best = 0
+        for name in names {
+            let stem = (name as NSString).deletingPathExtension
+            guard stem.hasPrefix(prefix) else { continue }
+            let num = stem.dropFirst(prefix.count)
+            if num.count >= 3, num.allSatisfy(\.isASCII), num.allSatisfy(\.isNumber), let n = Int(num) {
+                best = max(best, n)
+            }
+        }
+        return best
+    }
+
+    /// Next `count` output URLs in `dir`, e.g. base-005.ts, base-006.ts …
+    static func numberedOutputs(dir: URL, base: String, ext: String, count: Int) -> [URL] {
+        let start = lastIndex(in: dir, base: base) + 1
+        return (0..<max(1, count)).map {
+            dir.appendingPathComponent(String(format: "%@-%03d", base, start + $0)).appendingPathExtension(ext)
+        }
+    }
+
     /// progress: (0...1, message) on main thread. completion on main thread.
-    func run(info: MediaInfo, segments: [Segment], output: URL, mode: Mode,
+    /// `outputs`: one URL for .join, one per segment for .separate.
+    func run(info: MediaInfo, segments: [Segment], outputs: [URL], mode: Mode,
              progress: @escaping (Double, String) -> Void,
              completion: @escaping (Result<[URL], Error>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             let result: Result<[URL], Error>
             do {
-                result = .success(try self.work(info: info, segments: segments, output: output, mode: mode, progress: progress))
+                result = .success(try self.work(info: info, segments: segments, outputs: outputs, mode: mode, progress: progress))
             } catch {
                 result = .failure(error)
             }
@@ -36,9 +63,11 @@ final class Exporter {
         }
     }
 
-    private func work(info: MediaInfo, segments: [Segment], output: URL, mode: Mode,
+    private func work(info: MediaInfo, segments: [Segment], outputs: [URL], mode: Mode,
                       progress: @escaping (Double, String) -> Void) throws -> [URL] {
         guard let ffmpeg = FFTools.ffmpeg else { throw CutterError.toolMissing("ffmpeg") }
+        guard let output = outputs.first else { throw CutterError.ffmpeg("no output file") }
+        if mode == .separate && outputs.count < segments.count { throw CutterError.ffmpeg("not enough output names") }
         let fm = FileManager.default
         let total = segments.reduce(0) { $0 + $1.duration }
         let ext = output.pathExtension.lowercased()
@@ -48,10 +77,8 @@ final class Exporter {
         case .separate:
             var outs: [URL] = []
             var done = 0.0
-            let base = output.deletingPathExtension()
             for (i, seg) in segments.enumerated() {
-                let url = segments.count == 1 ? output
-                    : URL(fileURLWithPath: base.path + String(format: "_%02d.", i + 1) + output.pathExtension)
+                let url = outputs[i]
                 let msg = "Segment \(i + 1)/\(segments.count)"
                 try runFF(ffmpeg, cutArgs(info, seg, url, ext: ext), duration: seg.duration) { t in
                     report((done + t) / total, msg)

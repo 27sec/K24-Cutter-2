@@ -16,7 +16,8 @@ struct ExportSheet: View {
 
     @StateObject private var st = ExportState()
 
-    private var segments: [Segment] { model.exportSegments }
+    /// Snapshot taken when the sheet opens (the list may be cleared after export).
+    private var segments: [Segment] { st.segments }
 
     private var ext: String {
         switch st.container {
@@ -29,13 +30,25 @@ struct ExportSheet: View {
         }
     }
 
+    private var effectiveMode: Exporter.Mode { segments.count < 2 ? .join : st.mode }
+
+    private var baseName: String { model.info?.url.deletingPathExtension().lastPathComponent ?? "output" }
+
+    /// File names the next export will create: "<source>-NNN.ext", continuing from the folder.
+    private var plannedOutputs: [URL] {
+        guard let dir = st.outputDir else { return [] }
+        let count = effectiveMode == .separate ? segments.count : 1
+        return Exporter.numberedOutputs(dir: dir, base: baseName, ext: ext, count: count)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Export (lossless, no re-encode)").font(.title2.bold())
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("\(segments.count) segment(s) — total \(model.fmt(segments.reduce(0) { $0 + $1.duration }))  ·  ≈ \(TimeFmt.mb(model.estimatedBytes(segments.reduce(0) { $0 + $1.duration }))) MB")
+                    let total = segments.reduce(0) { $0 + $1.duration }
+                    Text("\(segments.count) segment(s) — total \(model.fmt(total))  ·  ≈ \(TimeFmt.mb(model.estimatedBytes(total))) MB")
                     ScrollView {
                         VStack(alignment: .leading, spacing: 2) {
                             ForEach(Array(segments.enumerated()), id: \.element.id) { i, s in
@@ -60,12 +73,19 @@ struct ExportSheet: View {
                 .pickerStyle(.radioGroup)
                 .disabled(segments.count < 2)
                 HStack {
-                    Text(st.output?.path ?? "—")
+                    Text(st.outputDir?.path ?? "—")
                         .lineLimit(1).truncationMode(.middle)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(st.output == nil ? .secondary : .primary)
-                    Button("Choose…") { choose() }
+                        .foregroundStyle(st.outputDir == nil ? .secondary : .primary)
+                    Button("Choose Folder…") { chooseFolder() }
                 }
+                LabeledContent("File name:") {
+                    Text(fileNameSummary)
+                        .font(.system(.callout, design: .monospaced))
+                        .lineLimit(2).truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+                Toggle("Clear segments after export", isOn: $st.clearAfterExport)
             }
             .disabled(st.running)
 
@@ -76,7 +96,7 @@ struct ExportSheet: View {
             if st.running || !st.results.isEmpty || st.error != nil {
                 VStack(alignment: .leading, spacing: 6) {
                     ProgressView(value: st.progress)
-                    Text(st.error ?? (st.results.isEmpty ? st.message : "Done — \(st.results.count) file(s) written"))
+                    Text(st.error ?? (st.results.isEmpty ? st.message : doneMessage))
                         .font(.callout)
                         .foregroundStyle(st.error == nil ? Color.primary : Color.red)
                         .textSelection(.enabled)
@@ -107,17 +127,31 @@ struct ExportSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 580)
-        .onAppear { st.output = defaultOutput() }
+        .frame(width: 600)
+        .onAppear {
+            st.segments = model.exportSegments
+            st.outputDir = model.info?.url.deletingLastPathComponent()
+        }
         .onDisappear {
             DispatchQueue.main.async {
                 NSApp.mainWindow?.makeFirstResponder(nil)
                 model.seek(to: model.cursor)    // refresh preview + strip
             }
         }
-        .onChange(of: st.container) { _ in
-            if let o = st.output { st.output = o.deletingPathExtension().appendingPathExtension(ext) }
-        }
+    }
+
+    private var fileNameSummary: String {
+        let names = plannedOutputs.map(\.lastPathComponent)
+        guard let first = names.first else { return "—" }
+        if names.count == 1 { return first }
+        return "\(first)  …  \(names.last!)  (\(names.count) files)"
+    }
+
+    private var doneMessage: String {
+        let names = st.results.map(\.lastPathComponent)
+        let list = names.count <= 3 ? names.joined(separator: ", ")
+            : "\(names.first!) … \(names.last!)"
+        return "Done — \(names.count) file(s) written: \(list)" + (st.clearedSegments ? "  ·  segment list cleared" : "")
     }
 
     private func close() {
@@ -125,51 +159,53 @@ struct ExportSheet: View {
         dismiss()
     }
 
-    private func defaultOutput() -> URL? {
-        guard let src = model.info?.url else { return nil }
-        let base = src.deletingPathExtension().lastPathComponent + "_cut"
-        var url = src.deletingLastPathComponent().appendingPathComponent(base).appendingPathExtension(ext)
-        var n = 2
-        while FileManager.default.fileExists(atPath: url.path) {
-            url = src.deletingLastPathComponent().appendingPathComponent("\(base)\(n)").appendingPathExtension(ext)
-            n += 1
-        }
-        return url
-    }
-
-    private func choose() {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = st.output?.lastPathComponent ?? "output.\(ext)"
-        if let dir = st.output?.deletingLastPathComponent() { panel.directoryURL = dir }
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        if panel.runModal() == .OK, var url = panel.url {
-            if url.pathExtension.lowercased() != ext { url = url.deletingPathExtension().appendingPathExtension(ext) }
-            st.output = url
-        }
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        panel.message = "Folder for the exported files"
+        if let dir = st.outputDir { panel.directoryURL = dir }
+        if panel.runModal() == .OK, let url = panel.url { st.outputDir = url }
     }
 
     private func start() {
         guard let info = model.info else { return }
-        if st.output == nil { choose() }
-        guard let out = st.output else { return }
-        if out.standardizedFileURL == info.url.standardizedFileURL {
+        if st.outputDir == nil { chooseFolder() }
+        // names are computed right now, so files written since the sheet opened are respected
+        let outs = plannedOutputs
+        guard !outs.isEmpty else { return }
+        if outs.contains(where: { $0.standardizedFileURL == info.url.standardizedFileURL }) {
             st.error = "Output must be different from the source file."
             return
         }
         let ex = Exporter()
+        let segs = segments
+        let clear = st.clearAfterExport
         st.exporter = ex
         st.running = true
         st.error = nil
         st.results = []
+        st.clearedSegments = false
         st.progress = 0
         st.message = "Starting…"
-        ex.run(info: info, segments: segments, output: out, mode: segments.count < 2 ? .join : st.mode,
+        ex.run(info: info, segments: segs, outputs: outs, mode: effectiveMode,
                progress: { p, m in st.progress = p; st.message = m },
                completion: { r in
                    st.running = false
                    switch r {
-                   case .success(let urls): st.results = urls; st.progress = 1
-                   case .failure(let e): st.error = e.localizedDescription
+                   case .success(let urls):
+                       st.results = urls
+                       st.progress = 1
+                       if clear {
+                           model.clearSegments()
+                           model.clearMarks()
+                           st.clearedSegments = true
+                       }
+                   case .failure(let e):
+                       st.error = e.localizedDescription
                    }
                })
     }
@@ -178,12 +214,14 @@ struct ExportSheet: View {
 final class ExportState: ObservableObject {
     @Published var container: ExportSheet.Container = .source
     @Published var mode: Exporter.Mode = .join
-    @Published var output: URL?
+    @Published var outputDir: URL?
+    @Published var clearAfterExport = true
+    @Published var segments: [Segment] = []
     @Published var running = false
     @Published var progress = 0.0
     @Published var message = ""
     @Published var results: [URL] = []
+    @Published var clearedSegments = false
     @Published var error: String?
     @Published var exporter: Exporter?
-
 }
