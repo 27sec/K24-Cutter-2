@@ -35,12 +35,17 @@ struct ControlPanel: View {
             .controlSize(.large)
 
             // Transport
-            HStack(spacing: 18) {
+            HStack(spacing: 10) {
                 group {
                     tb("backward.end.fill", "Go to start (Home)") { model.goToStart() }
                     tb("gobackward.60", "Back 1 minute (PgUp)") { model.jump(seconds: -60) }
-                    tb("gobackward.10", "Back 10 s (⌥← / J)") { model.jump(seconds: -10) }
-                    tb("backward.fill", "Back 1 s (⇧←)") { model.jump(seconds: -1) }
+                }
+                group {
+                    jb(-10, "Back 10 s (⌥← / J)")
+                    jb(-5, "Back 5 s")
+                    jb(-1, "Back 1 s (⇧←)")
+                }
+                group {
                     tb("backward.frame.fill", "Previous frame (←)") { model.step(frames: -1) }
                 }
                 Button { model.togglePlay() } label: {
@@ -52,8 +57,13 @@ struct ControlPanel: View {
                 .help("Play / Pause (Space)")
                 group {
                     tb("forward.frame.fill", "Next frame (→)") { model.step(frames: 1) }
-                    tb("forward.fill", "Forward 1 s (⇧→)") { model.jump(seconds: 1) }
-                    tb("goforward.10", "Forward 10 s (⌥→ / L)") { model.jump(seconds: 10) }
+                }
+                group {
+                    jb(1, "Forward 1 s (⇧→)")
+                    jb(5, "Forward 5 s")
+                    jb(10, "Forward 10 s (⌥→ / L)")
+                }
+                group {
                     tb("goforward.60", "Forward 1 minute (PgDn)") { model.jump(seconds: 60) }
                     tb("forward.end.fill", "Go to end (End)") { model.goToEnd() }
                 }
@@ -94,6 +104,17 @@ struct ControlPanel: View {
         HStack(spacing: 4) { c() }
             .padding(4)
             .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06)))
+    }
+
+    /// Jump button labelled with its offset, e.g. "−5s" / "+10s".
+    private func jb(_ secs: Int, _ help: String) -> some View {
+        Button { model.jump(seconds: Double(secs)) } label: {
+            Text(secs < 0 ? "−\(-secs)s" : "+\(secs)s")
+                .font(.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit())
+                .frame(width: 34, height: 26)
+        }
+        .buttonStyle(.borderless)
+        .help(help)
     }
 
     private func tb(_ icon: String, _ help: String, _ action: @escaping () -> Void) -> some View {
