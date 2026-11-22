@@ -2,6 +2,10 @@
 
 macOS app (Swift / SwiftUI) for cutting TV recordings (.ts / .m2ts / .mp4 / .mkv) **without re-encoding**. It uses ffmpeg stream copy. The layout follows VideoReDo.
 
+![K24 Cutter 2: preview, thumbnail strip, timeline with kept segments (green) and current selection (blue), segment list](docs/screenshot.png)
+
+**Download:** [latest release](https://github.com/27sec/K24-Cutter-2/releases/latest)
+
 ## Build
     brew install ffmpeg        # needs ffmpeg + ffprobe
     ./build_app.sh             # build + install to /Applications/K24 Cutter 2.app
