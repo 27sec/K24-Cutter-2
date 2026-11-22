@@ -20,3 +20,7 @@ Space = play/pause · ←/→ = 1 frame · ⇧←/→ = 1 s · ⌥←/→ or J/L
 Double-click a segment = load it into the marks for editing, then "Update Segment" · Delete = remove selected segments
 
 Note: stream copy can only cut on keyframes (GOP), so each segment may start up to ~0.5 s before the mark.
+
+## License
+
+MIT — see [LICENSE](LICENSE). ffmpeg/ffprobe are separate programs under their own (LGPL/GPL) licenses and are not bundled.
