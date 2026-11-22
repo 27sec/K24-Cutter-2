@@ -15,10 +15,13 @@ struct SegmentPanel: View {
                 TableColumn("#") { s in
                     Text("\((model.segments.firstIndex(of: s) ?? 0) + 1)").foregroundStyle(.secondary)
                 }
-                .width(24)
-                TableColumn("Start") { s in Text(model.fmt(s.start)).font(.system(.callout, design: .monospaced)) }
-                TableColumn("End") { s in Text(model.fmt(s.end)).font(.system(.callout, design: .monospaced)) }
-                TableColumn("Duration") { s in Text(model.fmt(s.duration)).font(.system(.callout, design: .monospaced)) }
+                .width(20)
+                TableColumn("Start") { s in timeCell(s.start) }
+                    .width(74)
+                TableColumn("End") { s in timeCell(s.end) }
+                    .width(74)
+                TableColumn("Duration") { s in timeCell(s.duration) }
+                    .width(74)
             }
             .contextMenu(forSelectionType: Segment.ID.self) { ids in
                 if ids.count == 1, let id = ids.first {
@@ -50,6 +53,12 @@ struct SegmentPanel: View {
         }
         .padding(10)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private func timeCell(_ t: Double) -> some View {
+        Text(model.fmt(t))
+            .font(.callout.monospacedDigit())
+            .lineLimit(1)
     }
 }
 

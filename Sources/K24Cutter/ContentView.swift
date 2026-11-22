@@ -20,7 +20,7 @@ struct ContentView: View {
                 .background(Color.black)
 
                 SegmentPanel()
-                    .frame(width: 330)
+                    .frame(width: 350)
             }
             Divider()
             ControlPanel()
