@@ -30,6 +30,8 @@ struct ExportSheet: View {
         }
     }
 
+    private var frameExact: Bool { model.info.map(Exporter.isFrameExact) ?? true }
+
     private var effectiveMode: Exporter.Mode { segments.count < 2 ? .join : st.mode }
 
     private var baseName: String { model.info?.url.deletingPathExtension().lastPathComponent ?? "output" }
@@ -43,7 +45,7 @@ struct ExportSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Export (lossless, no re-encode)").font(.title2.bold())
+            Text("Export (frame-exact)").font(.title2.bold())
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 6) {
@@ -89,7 +91,9 @@ struct ExportSheet: View {
             }
             .disabled(st.running)
 
-            Text("Stream copy keeps the original quality. Cuts snap to the nearest keyframe (GOP), so each segment may start up to ~0.5 s earlier than the mark.")
+            Text(frameExact
+                 ? "Cuts land exactly on the marked frames. Only the few frames between each mark and the nearest keyframe are re-encoded (high quality); everything else is copied untouched."
+                 : "This video codec cannot be re-encoded here, so cuts snap to the nearest keyframe (GOP) and each segment may start up to ~0.5 s earlier than the mark.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 

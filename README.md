@@ -1,6 +1,6 @@
 # K24 Cutter
 
-macOS app (Swift / SwiftUI) for cutting TV recordings (.ts / .m2ts / .mp4 / .mkv) **without re-encoding**. It uses ffmpeg stream copy. The layout follows VideoReDo.
+macOS app (Swift / SwiftUI) for cutting TV recordings (.ts / .m2ts / .mp4 / .mkv) **frame-exact, without re-encoding the whole video**. Like VideoReDo's smart rendering, only the few frames between each cut and the nearest keyframe are re-encoded; everything else is stream-copied with ffmpeg. The layout follows VideoReDo.
 
 ![K24 Cutter 2: preview, thumbnail strip, timeline with kept segments (green) and current selection (blue), segment list](docs/screenshot.png)
 
@@ -25,7 +25,15 @@ macOS app (Swift / SwiftUI) for cutting TV recordings (.ts / .m2ts / .mp4 / .mkv
 Space = play/pause · ←/→ = 1 frame · ⇧←/→ = 1 s · ⌥←/→ or J/L = 10 s · PgUp/PgDn = 1 min · Home/End
 Double-click a segment = load it into the marks for editing, then "Update Segment" · Delete = remove selected segments
 
-Note: stream copy can only cut on keyframes (GOP), so each segment may start up to ~0.5 s before the mark.
+## How cuts work
+Each segment starts and ends exactly on the marked frames (the frame at the end mark is not included):
+
+- **Head**: frames from the start mark up to the first IDR keyframe are re-encoded (H.264 → libx264, HEVC → libx265, MPEG-2 → mpeg2video, high quality, same pixel format and field order).
+- **Middle**: everything from that keyframe on is stream-copied untouched.
+- **Tail**: frames after the last usable keyframe up to the end mark are re-encoded.
+- **Audio** is stream-copied (packets whose middle lies inside the segment).
+
+Usually that is well under a second of re-encoded video per cut. If a segment has no IDR keyframe near its start (open-GOP H.264/HEVC broadcasts), the whole segment is re-encoded, because splicing in front of an open-GOP I-frame would show frames in the wrong order. Codecs other than H.264, HEVC and MPEG-2 fall back to plain stream copy, where cuts snap to the keyframe before the mark.
 
 ## License
 

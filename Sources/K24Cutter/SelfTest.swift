@@ -4,6 +4,7 @@ import Foundation
 enum SelfTest {
     static func runIfRequested() {
         let args = CommandLine.arguments
+        runCutTestIfRequested(args)
         guard let i = args.firstIndex(of: "--selftest"), i + 1 < args.count else { return }
         let url = URL(fileURLWithPath: args[i + 1])
         do {
@@ -40,6 +41,34 @@ enum SelfTest {
             print("last index after:", Exporter.lastIndex(in: dir, base: base))
         } catch {
             print("selftest error:", error.localizedDescription)
+        }
+        exit(0)
+    }
+
+    /// `K24Cutter --cuttest <file> <out.ext> <start> <end> [<start> <end> …]` : export the given
+    /// segments (seconds, snapped to frames) joined into one file, headless.
+    static func runCutTestIfRequested(_ args: [String]) {
+        guard let i = args.firstIndex(of: "--cuttest"), i + 4 < args.count else { return }
+        do {
+            let info = try MediaInfo.probe(URL(fileURLWithPath: args[i + 1]))
+            let out = URL(fileURLWithPath: args[i + 2])
+            let nums = args[(i + 3)...].compactMap(Double.init)
+            let segs = stride(from: 0, to: nums.count - 1, by: 2).map {
+                Segment(start: info.snap(nums[$0]), end: info.snap(nums[$0 + 1]))
+            }
+            print("frame-exact:", Exporter.isFrameExact(info), "segments:", segs.map { ($0.start, $0.end) })
+            let sem = DispatchSemaphore(value: 0)
+            let t0 = Date()
+            Exporter().run(info: info, segments: segs, outputs: [out], mode: .join, progress: { _, _ in }) { r in
+                switch r {
+                case .success(let urls): print("ok", urls.map(\.path), String(format: "%.2fs", Date().timeIntervalSince(t0)))
+                case .failure(let e): print("FAILED:", e.localizedDescription)
+                }
+                sem.signal()
+            }
+            while sem.wait(timeout: .now()) == .timedOut { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        } catch {
+            print("cuttest error:", error.localizedDescription)
         }
         exit(0)
     }

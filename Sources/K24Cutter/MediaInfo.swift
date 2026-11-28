@@ -12,6 +12,11 @@ struct MediaInfo {
     var displayWidth: Int
     var displayHeight: Int
     var interlaced: Bool
+    /// ffprobe field_order: "tt"/"tb" = top field first, "bb"/"bt" = bottom field first
+    var fieldOrder: String = "progressive"
+    var pixFmt: String = "yuv420p"
+    /// video stream time base (seconds per tick)
+    var timeBase: Double = 1.0 / 90000
     var videoCodec: String
     var audioDescriptions: [String]
     var formatName: String
@@ -23,8 +28,16 @@ struct MediaInfo {
 
     /// Snap a time onto the video frame grid.
     func snap(_ t: Double) -> Double {
-        let n = ((t - videoOffset) * fps).rounded()
-        return max(0, videoOffset + n / fps)
+        let n = max(0, ((t - videoOffset) * fps).rounded())
+        return videoOffset + n / fps
+    }
+
+    /// Segment snapped onto the frame grid and limited to the video's frames
+    /// (the end is exclusive: the frame at `end` is not part of the segment).
+    func frameAligned(_ s: Segment) -> Segment {
+        let start = snap(s.start)
+        let end = min(snap(s.end), lastFrameTime + frameDuration)
+        return Segment(id: s.id, start: start, end: max(start, end))
     }
 
     /// Preview size (display aspect, capped).
@@ -91,6 +104,9 @@ struct MediaInfo {
                          width: width, height: height,
                          displayWidth: max(2, dw), displayHeight: height,
                          interlaced: interlaced,
+                         fieldOrder: fieldOrder,
+                         pixFmt: v["pix_fmt"] as? String ?? "yuv420p",
+                         timeBase: ratio(v["time_base"]) ?? 1.0 / 90000,
                          videoCodec: v["codec_name"] as? String ?? "?",
                          audioDescriptions: audios,
                          formatName: format["format_name"] as? String ?? "?",
