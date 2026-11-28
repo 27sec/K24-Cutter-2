@@ -6,8 +6,8 @@
 #   ./build_app.sh --release     universal + zip for GitHub (dist/K24-Cutter-2-v<ver>-macOS.zip), no install
 # Flags can be combined.
 set -e
-VERSION="1.0"
-BUILD="1"
+VERSION="1.1"
+BUILD="2"
 INSTALL=1
 UNIVERSAL=0
 ZIP=0
