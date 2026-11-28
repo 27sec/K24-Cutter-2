@@ -4,7 +4,19 @@ macOS app (Swift / SwiftUI) for cutting TV recordings (.ts / .m2ts / .mp4 / .mkv
 
 ![K24 Cutter 2: preview, thumbnail strip, timeline with kept segments (green) and current selection (blue), segment list](docs/screenshot.png)
 
-**Download:** [latest release](https://github.com/27sec/K24-Cutter-2/releases/latest)
+**Download:** [latest release](https://github.com/27sec/K24-Cutter-2/releases/latest) (v1.1, universal: Apple Silicon + Intel, macOS 13 or later)
+
+## Install
+1. Download `K24-Cutter-2-v1.1-macOS.zip`, unzip it, and move **K24 Cutter 2.app** to Applications.
+2. Install ffmpeg: `brew install ffmpeg`. It is not bundled. Frame-exact cuts use its libx264, libx265 and mpeg2video encoders, which the Homebrew build includes.
+3. The app is not notarized, so macOS blocks the first launch. Right-click the app → **Open**, or run:
+   `xattr -dr com.apple.quarantine "/Applications/K24 Cutter 2.app"`
+
+## What's new in v1.1
+- **Frame-exact cuts**: segments start and end exactly on the marked frames instead of snapping to the previous keyframe, which could start up to about 0.5 s early. See [How cuts work](#how-cuts-work).
+- Fixed: a segment starting at 0:00 no longer repeats the first frame.
+- Fixed: cutting MPEG-TS no longer sometimes starts at the keyframe *after* the mark.
+- The segment table columns now fit, so Duration shows in full.
 
 ## Build
     brew install ffmpeg        # needs ffmpeg + ffprobe
@@ -33,7 +45,11 @@ Each segment starts and ends exactly on the marked frames (the frame at the end 
 - **Tail**: frames after the last usable keyframe up to the end mark are re-encoded.
 - **Audio** is stream-copied (packets whose middle lies inside the segment).
 
-Usually that is well under a second of re-encoded video per cut. If a segment has no IDR keyframe near its start (open-GOP H.264/HEVC broadcasts), the whole segment is re-encoded, because splicing in front of an open-GOP I-frame would show frames in the wrong order. Codecs other than H.264, HEVC and MPEG-2 fall back to plain stream copy, where cuts snap to the keyframe before the mark.
+Usually that is well under a second of re-encoded video per cut. If a segment has no IDR keyframe near its start (open-GOP H.264/HEVC broadcasts), the whole segment is re-encoded, because splicing in front of an open-GOP I-frame would show frames in the wrong order. Codecs other than H.264, HEVC and MPEG-2 fall back to plain stream copy, where cuts snap to the keyframe before the mark. The Export window shows which mode applies to the open file.
+
+To check an export without the UI:
+
+    "dist/K24 Cutter 2.app/Contents/MacOS/K24Cutter" --cuttest <input> <output.ts|mp4|mkv> <start> <end> [<start> <end> …]
 
 ## License
 
